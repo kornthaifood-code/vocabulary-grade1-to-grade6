@@ -60,7 +60,7 @@ body{display:flex;align-items:center;justify-content:center;padding:8px}
 <div class="header"><button class="back" id="backBtn">←</button><div class="header-title"><b id="gameTitle">Grade 1 Vocabulary</b><small>200 คำศัพท์</small></div><div class="score"><small>คะแนน</small><strong id="score">0</strong></div></div>
 <div class="stats"><div class="stat"><small>ข้อ</small><b id="count">1 / 200</b></div><div class="stat"><small>หมวด</small><b id="catTop">คำศัพท์</b></div><div class="stat"><small>ตอบถูก</small><b id="correct">0</b></div></div>
 <div class="progress-wrap"><div class="progress" id="bar"></div></div>
-<div class="card"><div class="icon">🎧</div><div class="category" id="category">คำศัพท์</div><div class="prompt">ฟังเสียง แล้วเลือกคำที่ได้ยิน</div><div class="hint">กดปุ่มฟังซ้ำได้</div>
+<div class="card"><div class="icon">🎧</div><div class="category" id="category">คำศัพท์</div><div class="prompt">ฟังเสียง แล้วเลือกคำที่ได้ยิน</div><div class="hint" id="audioHint">กดปุ่มฟังซ้ำได้</div>
 <button class="listen" id="listenBtn">🔊 ฟังคำศัพท์</button><div class="answers" id="answers"></div><div class="feedback" id="feedback"></div></div>
 <div class="bottom"><button id="skipBtn">⏭️ ข้ามข้อ</button><button id="restartBtn">🔄 เริ่มใหม่</button></div>
 <div class="copy">© 2026 Tanakorn Saengsin. All rights reserved.</div>
@@ -80,11 +80,79 @@ function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Ma
 function show(s){[home,game,result].forEach(x=>x.classList.remove('show'));s.classList.add('show')}
 function buildDeck(){deck=[];gradeData[currentGrade].forEach(g=>g.words.forEach(word=>deck.push({cat:g.cat,word,options:g.words})));deck=shuffle(deck)}
 function startGrade(g){currentGrade=String(g);buildDeck();idx=0;score=0;correct=0;locked=false;document.getElementById('gameTitle').textContent='Grade '+currentGrade+' Vocabulary';show(game);render()}
-function render(){if(idx>=deck.length){finish();return}locked=false;feedback.textContent='';feedback.className='feedback';const q=deck[idx];document.getElementById('category').textContent=q.cat;document.getElementById('catTop').textContent=q.cat;document.getElementById('score').textContent=score;document.getElementById('correct').textContent=correct;document.getElementById('count').textContent=(idx+1)+' / 200';document.getElementById('bar').style.width=((idx+1)/200*100)+'%';const wrong=shuffle(q.options.filter(w=>w!==q.word)).slice(0,3),opts=shuffle([q.word,...wrong]);answers.innerHTML='';opts.forEach(word=>{const b=document.createElement('button');b.className='answer';b.textContent=word;b.onclick=()=>choose(b,word);answers.appendChild(b)});setTimeout(speak,220)}
+function render(){if(idx>=deck.length){finish();return}locked=false;feedback.textContent='';feedback.className='feedback';const q=deck[idx];document.getElementById('category').textContent=q.cat;document.getElementById('catTop').textContent=q.cat;document.getElementById('score').textContent=score;document.getElementById('correct').textContent=correct;document.getElementById('count').textContent=(idx+1)+' / 200';document.getElementById('bar').style.width=((idx+1)/200*100)+'%';const wrong=shuffle(q.options.filter(w=>w!==q.word)).slice(0,3),opts=shuffle([q.word,...wrong]);answers.innerHTML='';opts.forEach(word=>{const b=document.createElement('button');b.className='answer';b.textContent=word;b.onclick=()=>choose(b,word);answers.appendChild(b)});setTimeout(()=>speak(false),220)}
 function choose(btn,word){if(locked)return;locked=true;const q=deck[idx],bs=[...answers.querySelectorAll('button')];bs.forEach(b=>b.disabled=true);if(word===q.word){score+=10;correct++;btn.classList.add('correct');btn.textContent='✓ '+word;feedback.textContent='✅ ถูกต้อง!';feedback.classList.add('good')}else{btn.classList.add('wrong');btn.textContent='✕ '+word;bs.forEach(b=>{if(b.textContent===q.word){b.classList.add('correct');b.textContent='✓ '+q.word}});feedback.textContent='คำตอบคือ '+q.word;feedback.classList.add('bad')}document.getElementById('score').textContent=score;document.getElementById('correct').textContent=correct;setTimeout(()=>{idx++;render()},900)}
-function speak(){if(idx>=deck.length||!('speechSynthesis' in window))return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(deck[idx].word);u.lang='en-US';u.rate=.78;speechSynthesis.speak(u)}
+let ttsVoices=[],fallbackAudio=null,ttsToken=0;
+const audioHint=document.getElementById('audioHint');
+function loadVoices(){
+  if(!('speechSynthesis' in window))return [];
+  const v=window.speechSynthesis.getVoices()||[];
+  if(v.length)ttsVoices=v;
+  return ttsVoices;
+}
+function pickEnglishVoice(){
+  const v=loadVoices();
+  return v.find(x=>/^en-US/i.test(x.lang)&&/Google|Microsoft|Samantha|English/i.test(x.name))||
+         v.find(x=>/^en-US/i.test(x.lang))||
+         v.find(x=>/^en-/i.test(x.lang))||null;
+}
+function setAudioHint(msg){if(audioHint)audioHint.textContent=msg}
+function stopFallback(){
+  if(fallbackAudio){try{fallbackAudio.pause();fallbackAudio.currentTime=0}catch(e){}fallbackAudio=null}
+}
+function fallbackSpeak(word){
+  stopFallback();
+  const sources=[
+    'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q='+encodeURIComponent(word),
+    'https://dict.youdao.com/dictvoice?type=2&audio='+encodeURIComponent(word)
+  ];
+  let pos=0;
+  const tryNext=()=>{
+    if(pos>=sources.length){setAudioHint('เสียงถูกบล็อกใน Facebook — กด ⋮ แล้วเปิดใน Chrome');return}
+    const a=new Audio();fallbackAudio=a;a.preload='auto';a.src=sources[pos++];
+    a.onplaying=()=>setAudioHint('🔊 กำลังเล่นเสียงภาษาอังกฤษ');
+    a.onended=()=>setAudioHint('กดปุ่มฟังซ้ำได้');
+    a.onerror=tryNext;
+    const p=a.play();
+    if(p&&p.catch)p.catch(tryNext);
+  };
+  tryNext();
+}
+function speak(userInitiated=false){
+  if(idx>=deck.length)return;
+  const word=deck[idx].word;
+  const token=++ttsToken;
+  stopFallback();
+  if(!('speechSynthesis' in window)||typeof SpeechSynthesisUtterance==='undefined'){
+    if(userInitiated)fallbackSpeak(word);
+    else setAudioHint('แตะ 🔊 ฟังคำศัพท์ เพื่อเปิดเสียง');
+    return;
+  }
+  try{
+    const synth=window.speechSynthesis;
+    synth.cancel();
+    synth.resume();
+    const u=new SpeechSynthesisUtterance(word);
+    u.lang='en-US';u.rate=.78;u.pitch=1;u.volume=1;
+    const voice=pickEnglishVoice();if(voice)u.voice=voice;
+    let started=false,finished=false;
+    u.onstart=()=>{started=true;if(token===ttsToken)setAudioHint('🔊 กำลังเล่นเสียงภาษาอังกฤษ')};
+    u.onend=()=>{finished=true;if(token===ttsToken)setAudioHint('กดปุ่มฟังซ้ำได้')};
+    u.onerror=()=>{finished=true;if(token===ttsToken&&userInitiated)fallbackSpeak(word)};
+    synth.speak(u);
+    // Facebook/Android WebView บางรุ่นรับคำสั่งแต่ไม่เริ่มพูด: ถ้าเป็นการกดปุ่ม ให้สลับไปเสียงออนไลน์
+    if(userInitiated){setTimeout(()=>{if(token===ttsToken&&!started&&!finished){try{synth.cancel()}catch(e){}fallbackSpeak(word)}},1300)}
+  }catch(e){
+    if(userInitiated)fallbackSpeak(word);
+    else setAudioHint('แตะ 🔊 ฟังคำศัพท์ เพื่อเปิดเสียง');
+  }
+}
+if('speechSynthesis' in window){
+  loadVoices();
+  window.speechSynthesis.onvoiceschanged=loadVoices;
+}
 function finish(){show(result);const pct=Math.round(correct/2);const e=document.getElementById('resultEmoji'),t=document.getElementById('resultTitle');if(pct>=90){e.textContent='🏆';t.textContent='ยอดเยี่ยมมาก!'}else if(pct>=75){e.textContent='🌟';t.textContent='เก่งมาก!'}else if(pct>=60){e.textContent='👏';t.textContent='ทำได้ดี!'}else{e.textContent='🌈';t.textContent='ลองอีกครั้งนะ!'}document.getElementById('resultText').innerHTML='Grade <b>'+currentGrade+'</b><br>ตอบถูก <b>'+correct+'</b> จาก <b>200</b> ข้อ<br>คิดเป็น <b>'+pct+'%</b><br>คะแนน <b>'+score+' / 2000</b>'}
-document.querySelectorAll('.gradebtn').forEach(b=>b.onclick=()=>startGrade(b.dataset.grade));document.getElementById('listenBtn').onclick=speak;document.getElementById('skipBtn').onclick=()=>{if(!locked){idx++;render()}};document.getElementById('restartBtn').onclick=()=>startGrade(currentGrade);document.getElementById('againBtn').onclick=()=>startGrade(currentGrade);document.getElementById('homeBtn').onclick=()=>show(home);document.getElementById('backBtn').onclick=()=>show(home);show(home);
+document.querySelectorAll('.gradebtn').forEach(b=>b.onclick=()=>{if('speechSynthesis' in window){try{speechSynthesis.resume();loadVoices()}catch(e){}}startGrade(b.dataset.grade)});document.getElementById('listenBtn').onclick=()=>speak(true);document.getElementById('skipBtn').onclick=()=>{if(!locked){idx++;render()}};document.getElementById('restartBtn').onclick=()=>startGrade(currentGrade);document.getElementById('againBtn').onclick=()=>startGrade(currentGrade);document.getElementById('homeBtn').onclick=()=>show(home);document.getElementById('backBtn').onclick=()=>show(home);show(home);
 </script>
 </body>
 </html>
