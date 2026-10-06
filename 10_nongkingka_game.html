@@ -1,0 +1,42 @@
+<!doctype html><html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>5 เสียงที่คนไทยฟังผิดบ่อยที่สุด | Nongkingka</title>
+<style>
+*{box-sizing:border-box}:root{--ink:#102d33;--mint:#67d4ad;--paper:#f5f7f2;--soft:#e4f4ed}
+html,body{margin:0;width:100%;height:100%;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--paper);color:var(--ink);overflow:hidden}
+.screen{display:none;width:100%;height:100dvh;padding:12px;align-items:center;justify-content:center}.screen.on{display:flex}
+.card{width:min(94vw,560px);height:min(94dvh,820px);background:#fff;border:1px solid #d9e3df;border-radius:26px;box-shadow:0 24px 70px #173a3018;padding:28px 24px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;overflow:hidden}
+.brand{position:absolute;top:22px;left:24px;font-size:10px;font-weight:900;letter-spacing:1.8px}.count{position:absolute;top:18px;right:22px;font:900 12px monospace;padding:7px 10px;border:1px solid #dce4e1;border-radius:9px}
+.eyebrow{font-size:10px;letter-spacing:2px;font-weight:900;color:#66807c}h1{font-family:Georgia,serif;font-size:clamp(35px,10vw,58px);line-height:.98;margin:14px 0 12px}.sub{font-size:13px;color:#6a7d78;line-height:1.55;max-width:390px}
+.start{margin-top:28px;border:0;border-radius:999px;background:var(--ink);color:#fff;padding:14px 30px;font-weight:900;letter-spacing:1px}
+.hook{font-size:12px;color:#68807b;font-weight:800;margin-bottom:22px}.word{font-size:clamp(40px,12vw,68px);font-weight:950;line-height:.95;letter-spacing:-2px}.phon{margin-top:12px;color:#27715f;font-size:20px;font-weight:800}.meaning{font-family:Georgia,serif;font-size:27px;margin:18px 0 8px}.sentence{border-top:1px solid #dfe7e4;width:100%;padding-top:18px;margin-top:10px;font:700 19px/1.4 Georgia,serif}.thai{color:#6d7d79;line-height:1.5;margin-top:7px}.speaker{margin:12px 0;border:0;background:var(--soft);width:52px;height:52px;border-radius:50%;font-size:22px}.progress{position:absolute;bottom:0;left:0;height:5px;background:var(--mint);width:0}.timer{position:absolute;bottom:18px;font:800 10px monospace;letter-spacing:1px;color:#8a9996}.finish{font-size:55px}.credit{position:absolute;bottom:36px;font-size:9px;font-weight:900;letter-spacing:2px;color:#91a09d}
+</style></head><body>
+<section id="intro" class="screen on"><div class="card"><div class="brand">NONGKINGKA</div><div class="eyebrow">5-WORD ENGLISH CHALLENGE • EP.10</div><h1>5 เสียงที่คนไทยฟังผิดบ่อยที่สุด</h1><div class="sub">Listening Trap<br>เริ่มแล้วระบบจะอ่านและเลื่อนไปคำถัดไปอัตโนมัติ</div><div class="sub" style="margin-top:24px;font-weight:800">กำลังเริ่มอัตโนมัติ • 3 วินาที</div><div class="credit">NONGKINGKA</div></div></section>
+<section id="game" class="screen"><div class="card"><div class="brand">NONGKINGKA</div><div id="count" class="count"></div><div id="content"></div><div class="timer">AUTO • EN → TH → SENTENCE</div><div id="progress" class="progress"></div></div></section>
+<section id="finish" class="screen"><div class="card"><div class="brand">NONGKINGKA</div><div class="finish">🏆</div><h1>ครบ 5 คำ!</h1><div class="sub">5 เสียงที่คนไทยฟังผิดบ่อยที่สุด</div><div class="credit">NONGKINGKA</div></div></section>
+<script>
+const words=[["SHIP", "ชิพ", "เรือ", "The ship left the port.", "เรือออกจากท่า"], ["SHEEP", "ชีพ", "แกะ", "The sheep are in the field.", "แกะอยู่ในทุ่ง"], ["RICE", "ไรซ์", "ข้าว", "We eat rice every day.", "เรากินข้าวทุกวัน"], ["RISE", "ไรซ์ (เสียง z)", "เพิ่มขึ้น / ลุกขึ้น", "Prices may rise again.", "ราคาอาจเพิ่มขึ้นอีก"], ["THREE", "ธรี", "สาม", "I have three books.", "ฉันมีหนังสือสามเล่ม"]];let i=0,timer=null;
+function start(){document.querySelector('#intro').classList.remove('on');document.querySelector('#game').classList.add('on');i=0;show();}
+function show(){clearTimeout(timer);let w=words[i];document.querySelector('#count').textContent=(i+1)+' / 5';document.querySelector('#progress').style.width=((i+1)*20)+'%';document.querySelector('#content').innerHTML=`<div class="hook">5 เสียงที่คนไทยฟังผิดบ่อยที่สุด</div><div class="word">${w[0]}</div><div class="phon">${w[1]}</div><button class="speaker" onclick="speak()">🔊</button><div class="meaning">${w[2]}</div><div class="sentence">${w[3]}</div><div class="thai">${w[4]}</div>`;speak();timer=setTimeout(next,10500);}
+function speak(){
+if(!('speechSynthesis' in window))return;
+speechSynthesis.cancel();
+let w=words[i];
+const queue=[
+ [w[0],'en-US',.78],
+ [w[2],'th-TH',.82],
+ [w[3],'en-US',.78]
+];
+let n=0;
+function sayNext(){
+ if(n>=queue.length)return;
+ let q=queue[n++],u=new SpeechSynthesisUtterance(q[0]);
+ u.lang=q[1];u.rate=q[2];
+ u.onend=sayNext;
+ speechSynthesis.speak(u);
+}
+sayNext();
+}
+function next(){if(i<4){i++;show()}else{clearTimeout(timer);speechSynthesis.cancel();document.querySelector('#game').classList.remove('on');document.querySelector('#finish').classList.add('on')}}
+window.addEventListener('load',()=>{setTimeout(start,3000);});
+</script></body></html>
